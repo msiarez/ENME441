@@ -1,0 +1,31 @@
+import RPi.GPIO as GPIO
+import time
+import math
+
+GPIO.setmode(GPIO.BCM)
+p_1 = []
+f_pwm = 500 # base frequency of 500 Hz
+f_B = 0.2 # variation frequency of brightness levels
+phi = math.pi / 11
+
+for pin in p:
+	GPIO.setup(pin, GPIO.OUT)
+	pwm = GPIO.PWM(pin, f_pwm)
+
+try:
+	for pwm in pwm:
+		pwm.start(0) # initiate PWM at 0% duty cycle
+
+	t_0 = time.time()
+
+	while 1:
+		t = time.time() - t_0
+
+		for i, pwm in enumerate(pwm):
+			B = math.sin(2 * math.pi * f_B * t - i * phi) ** 2
+			pwm.ChangeDutyCycle(100 * B)
+
+except KeyboardInterrupt: # stop gracefully on ctrl-C
+	print('\nExiting')
+	pwm.stop()
+	GPIO.cleanup()
