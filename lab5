@@ -4,9 +4,16 @@ import math
 
 GPIO.setmode(GPIO.BCM)
 p_1 = []
+button = 
 f_pwm = 500 # base frequency of 500 Hz
 f_B = 0.2 # variation frequency of brightness levels
 phi = math.pi / 11
+b = 1
+
+def switch():
+	b = -1
+
+gpio.add_event_detect(button, gpio.RISING, callback=switch, bouncetime = 100)
 
 for pin in p:
 	GPIO.setup(pin, GPIO.OUT)
@@ -22,7 +29,7 @@ try:
 		t = time.time() - t_0
 
 		for i, pwm in enumerate(pwm):
-			B = math.sin(2 * math.pi * f_B * t - i * phi) ** 2
+			B = math.sin(2 * math.pi * f_B * t - b * i * phi) ** 2
 			pwm.ChangeDutyCycle(100 * B)
 
 except KeyboardInterrupt: # stop gracefully on ctrl-C
