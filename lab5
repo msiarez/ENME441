@@ -3,7 +3,7 @@ import time
 import math
 
 GPIO.setmode(GPIO.BCM)
-p_1 = [21, 20, 16, 12, 26, 19]
+p = [21, 20, 16, 12, 26, 19]
 button = 4
 f_pwm = 500 # base frequency of 500 Hz
 f_B = 0.2 # variation frequency of brightness levels
