@@ -9,19 +9,16 @@ button = 4
 f_pwm = 500  # PWM base frequency
 f_B = 0.2    # brightness variation frequency
 phi = math.pi / 11
-b = 1        # direction multiplier
-
-GPIO.setup(button, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
+b = 1        
 
 pwms = []
 for pin in p:
     GPIO.setup(pin, GPIO.OUT)
     pwms.append(GPIO.PWM(pin, f_pwm))
 
-# Callback function for button press
-def switch(channel):
+def switch():
     global b
-    b = -b  # reverse wave direction
+    b = -1  # reverse wave direction
 
 GPIO.add_event_detect(button, GPIO.RISING, callback=switch, bouncetime=100)
 
