@@ -20,7 +20,7 @@ for pin in p:
 
 def switch(channel):
     global b
-    b = -1  # reverse wave direction
+    b *= -1  # reverse wave direction
 
 GPIO.add_event_detect(button, GPIO.RISING, callback=switch, bouncetime=100)
 
