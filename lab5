@@ -3,36 +3,43 @@ import time
 import math
 
 GPIO.setmode(GPIO.BCM)
-p = [21, 20, 16, 12, 26, 19, 13, 6, 5, 14]
+
+p = [21, 20, 16, 12, 26, 19, 13, 6, 5, 14]  # LED pins
 button = 4
-f_pwm = 500 # base frequency of 500 Hz
-f_B = 0.2 # variation frequency of brightness levels
+f_pwm = 500  # PWM base frequency
+f_B = 0.2    # brightness variation frequency
 phi = math.pi / 11
-b = 1
+b = 1        # direction multiplier
 
-def switch():
-	b = -1
+GPIO.setup(button, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
 
-gpio.add_event_detect(button, gpio.RISING, callback=switch, bouncetime = 100)
-
+pwms = []
 for pin in p:
-	GPIO.setup(pin, GPIO.OUT)
-	pwm = GPIO.PWM(pin, f_pwm)
+    GPIO.setup(pin, GPIO.OUT)
+    pwms.append(GPIO.PWM(pin, f_pwm))
+
+# Callback function for button press
+def switch(channel):
+    global b
+    b = -b  # reverse wave direction
+
+GPIO.add_event_detect(button, GPIO.RISING, callback=switch, bouncetime=100)
 
 try:
-	for pwm in pwm:
-		pwm.start(0) # initiate PWM at 0% duty cycle
+    for pwm in pwms:
+        pwm.start(0)
 
-	t_0 = time.time()
+    t_0 = time.time()
 
-	while 1:
-		t = time.time() - t_0
+    while True:
+        t = time.time() - t_0
 
-		for i, pwm in enumerate(pwm):
-			B = math.sin(2 * math.pi * f_B * t - b * i * phi) ** 2
-			pwm.ChangeDutyCycle(100 * B)
+        for i, pwm in enumerate(pwms):
+            B = math.sin(2 * math.pi * f_B * t - b * i * phi) ** 2
+            pwm.ChangeDutyCycle(100 * B)
 
-except KeyboardInterrupt: # stop gracefully on ctrl-C
-	print('\nExiting')
-	pwm.stop()
-	GPIO.cleanup()
+except KeyboardInterrupt:
+    print('\nExiting...')
+    for pwm in pwms:
+        pwm.stop()
+    GPIO.cleanup()
