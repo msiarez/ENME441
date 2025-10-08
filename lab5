@@ -11,12 +11,14 @@ f_B = 0.2    # brightness variation frequency
 phi = math.pi / 11
 b = 1        
 
+GPIO.setup(button, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
+
 pwms = []
 for pin in p:
     GPIO.setup(pin, GPIO.OUT)
     pwms.append(GPIO.PWM(pin, f_pwm))
 
-def switch():
+def switch(channel):
     global b
     b = -1  # reverse wave direction
 
