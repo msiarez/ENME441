@@ -56,18 +56,18 @@ def toggle_wrap(channel):
     bug.isWrapOn = not bug.isWrapOn
     print(f"Wrap mode toggled: {bug.isWrapOn}")
 
-GPIO.add_event_detect(s2, GPIO.RISING, callback=toggle_wrap, bouncetime=300)
+GPIO.add_event_detect(switch2, GPIO.RISING, callback=toggle_wrap, bouncetime=300)
 
 try:
     while True:
-        if GPIO.input(s1):
+        if GPIO.input(switch1):
             if not bug._running:
                 bug.start()
         else:
             if bug._running:
                 bug.stop()
 
-        current_step = bug.timestep / 3 if GPIO.input(s3) else bug.timestep
+        current_step = bug.timestep / 3 if GPIO.input(switch3) else bug.timestep
 
         bug.step(current_step)
 
