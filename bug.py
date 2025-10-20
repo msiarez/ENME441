@@ -42,9 +42,9 @@ dataPin = 23
 latchPin = 24
 clockPin = 25
 
-switch1 = 17
-switch2 = 27 
-switch3 = 22 
+switch1 = 2
+switch2 = 3 
+switch3 = 4 
 
 GPIO.setmode(GPIO.BCM)
 for pin in [switch1, switch2, switch3]:
