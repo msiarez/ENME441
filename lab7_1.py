@@ -1,9 +1,6 @@
 import socket
 import RPi.GPIO as GPIO
 
-# =========================
-#  GPIO + PWM SETUP
-# =========================
 led_pins = [17, 27, 22]       # BCM pin numbers for the 3 LEDs
 freq = 1000                 # PWM frequency (Hz)
 brightness = [0, 0, 0]      # store current brightness % for each LED
@@ -16,10 +13,6 @@ for pin in led_pins:
     pwm.start(0)
     pwms.append(pwm)
 
-
-# =========================
-#  BRIGHTNESS CONTROL
-# =========================
 def change_brightness(index, value):
     """Clamp and set LED brightness."""
     try:
@@ -31,10 +24,6 @@ def change_brightness(index, value):
     pwms[index].ChangeDutyCycle(val)
 
 
-# =========================
-#  POST DATA PARSER
-# =========================
-def parsePOSTdata(data):
     """Extract key:value pairs from POST body."""
     try:
         data = data.decode('utf-8')
@@ -51,9 +40,6 @@ def parsePOSTdata(data):
     return result
 
 
-# =========================
-#  HTML PAGE BUILDER
-# =========================
 def web_page(selected_led=0):
     """Generate an HTML form showing current brightness for all LEDs."""
     c0 = 'checked' if selected_led == 0 else ''
@@ -84,9 +70,6 @@ def web_page(selected_led=0):
     return bytes(html, "utf-8")
 
 
-# =========================
-#  WEB SERVER LOOP
-# =========================
 def serve_web_page():
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -121,9 +104,6 @@ def serve_web_page():
         conn.close()
 
 
-# =========================
-#  MAIN
-# =========================
 try:
     serve_web_page()
 except KeyboardInterrupt:
