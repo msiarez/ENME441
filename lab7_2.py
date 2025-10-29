@@ -4,7 +4,7 @@ import RPi.GPIO as GPIO
 # =========================
 # GPIO + PWM SETUP
 # =========================
-led_pins = [5, 6, 26]      # BCM pin numbers for the 3 LEDs
+led_pins = [17, 27, 22]      # BCM pin numbers for the 3 LEDs
 freq = 1000                # PWM frequency (Hz)
 brightness = [0, 0, 0]     # store current brightness % for each LED
 pwms = []
@@ -58,45 +58,53 @@ def web_page():
     """Generate HTML + JavaScript for real-time LED control."""
     html = f'''
 <html>
-<head>
-<title>Live LED Brightness Control</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<style>
-html{{font-family: Helvetica; text-align:center;}}
-input[type=range]{{width:50%;}}
-</style>
-<script>
-function updateLED(ledIndex, value) {{
-  // Display value beside slider
-  document.getElementById("val"+ledIndex).innerText = value + "%";
-
-  // Send AJAX POST request
-  var xhr = new XMLHttpRequest();
-  xhr.open("POST", "/", true);
-  xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
-  xhr.send("led=" + ledIndex + "&brightness=" + value);
-}}
-</script>
-</head>
+<head><title>LED Brightness Control</title></head>
 <body>
-<h1>Live LED Brightness Control</h1>
 
-<p><b>Move the sliders below to adjust LED brightness instantly.</b></p>
-
+<!-- Problem 2: three independent sliders, no submit button -->
 <div>
-  <p>LED 1: <span id="val0">{brightness[0]}%</span></p>
-  <input type="range" min="0" max="100" value="{brightness[0]}" oninput="updateLED(0, this.value)">
+  LED1:
+  <input id="s0" type="range" min="0" max="100" value="{brightness[0]}">
+  <span id="v0">{brightness[0]}</span>
+</div>
+<br>
+<div>
+  LED2:
+  <input id="s1" type="range" min="0" max="100" value="{brightness[1]}">
+  <span id="v1">{brightness[1]}</span>
+</div>
+<br>
+<div>
+  LED3:
+  <input id="s2" type="range" min="0" max="100" value="{brightness[2]}">
+  <span id="v2">{brightness[2]}</span>
 </div>
 
-<div>
-  <p>LED 2: <span id="val1">{brightness[1]}%</span></p>
-  <input type="range" min="0" max="100" value="{brightness[1]}" oninput="updateLED(1, this.value)">
-</div>
+<script>
+// Attach input listeners that (1) update the % readout and (2) POST to the server.
+function wireSlider(idx) {{
+  var s = document.getElementById('s' + idx);
+  var v = document.getElementById('v' + idx);
+  function send(val) {{
+    // POST as application/x-www-form-urlencoded
+    fetch('/', {{
+      method: 'POST',
+      headers: {{ 'Content-Type': 'application/x-www-form-urlencoded' }},
+      body: 'led=' + idx + '&brightness=' + encodeURIComponent(val)
+    }}).catch(function(e){{ console.log(e); }});
+  }}
+  // live update the number and send to server on every change
+  s.addEventListener('input', function() {{
+    v.textContent = s.value;
+    send(s.value);
+  }});
+}}
 
-<div>
-  <p>LED 3: <span id="val2">{brightness[2]}%</span></p>
-  <input type="range" min="0" max="100" value="{brightness[2]}" oninput="updateLED(2, this.value)">
-</div>
+// Wire all three sliders
+wireSlider(0);
+wireSlider(1);
+wireSlider(2);
+</script>
 
 </body>
 </html>
