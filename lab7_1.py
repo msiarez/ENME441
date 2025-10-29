@@ -4,7 +4,7 @@ import RPi.GPIO as GPIO
 # =========================
 #  GPIO + PWM SETUP
 # =========================
-led_pins = [5, 6, 26]       # BCM pin numbers for the 3 LEDs
+led_pins = [17, 27, 22]       # BCM pin numbers for the 3 LEDs
 freq = 1000                 # PWM frequency (Hz)
 brightness = [0, 0, 0]      # store current brightness % for each LED
 pwms = []
