@@ -1,173 +1,90 @@
+import RPi.GPIO as gpio
+import threading
 import socket
-import RPi.GPIO as GPIO
-import time
 
-# =========================
-#  GPIO + PWM SETUP
-# =========================
-led_pins = [5, 6, 26]      # BCM pin numbers for the 3 LEDs
-freq = 1000                # PWM frequency (Hz)
-brightness = [0, 0, 0]     # store current brightness % for each LED
+gpio.setmode(gpio.BCM)
+
+# Define PWM LED pins
+led_pins = [17, 27, 22]
 pwms = []
-
-GPIO.setmode(GPIO.BCM)
 for pin in led_pins:
-    GPIO.setup(pin, GPIO.OUT)
-    pwm = GPIO.PWM(pin, freq)
-    pwm.start(0)
-    pwms.append(pwm)
+    gpio.setup(pin, gpio.OUT)
+    p = gpio.PWM(pin, 1000)  # 1 kHz PWM
+    p.start(0)
+    pwms.append(p)
 
+# Track brightness levels for each LED
+brightness = [0, 0, 0]  # percent duty cycle
 
-# =========================
-#  BRIGHTNESS CONTROL
-# =========================
-def change_brightness(index, value):
-    """Clamp and set LED brightness."""
-    try:
-        val = int(value)
-    except:
-        val = 0
-    val = max(0, min(100, val))
-    brightness[index] = val
-    pwms[index].ChangeDutyCycle(val)
+def set_brightness(led_idx, value):
+    brightness[led_idx] = value
+    pwms[led_idx].ChangeDutyCycle(value)
 
-
-# =========================
-#  POST DATA PARSER
-# =========================
-def parsePOSTdata(data):
-    """Extract key:value pairs from POST body (x-www-form-urlencoded)."""
-    try:
-        text = data.decode('utf-8', errors='replace')
-    except:
-        text = str(data)
-    body_start = text.find('\r\n\r\n') + 4
-    body = text[body_start:]
-    # minimal parsing (good enough for short bodies like 'led=1&brightness=77')
-    pairs = body.split('&')
-    result = {}
-    for p in pairs:
-        if '=' in p:
-            k, v = p.split('=', 1)
-            # replace + with space; percent-decoding not needed for digits
-            result[k] = v.replace('+', ' ')
-    return result
-
-
-# =========================
-#  HTML + JAVASCRIPT PAGE (Problem 2)
-# =========================
 def web_page():
-    # Use a triple-single-quoted f-string to avoid accidental """ conflicts
     html = f'''
 <html>
 <head><title>LED Brightness Control</title></head>
 <body>
+<form action="/" method="POST">
 
-<!-- Problem 2: three independent sliders, no submit button -->
-<div>
-  LED1:
-  <input id="s0" type="range" min="0" max="100" value="{brightness[0]}">
-  <span id="v0">{brightness[0]}</span>
-</div>
-<br>
-<div>
-  LED2:
-  <input id="s1" type="range" min="0" max="100" value="{brightness[1]}">
-  <span id="v1">{brightness[1]}</span>
-</div>
-<br>
-<div>
-  LED3:
-  <input id="s2" type="range" min="0" max="100" value="{brightness[2]}">
-  <span id="v2">{brightness[2]}</span>
-</div>
+  LED Brightness Control<br><br>
 
-<script>
-// Attach input listeners that (1) update the % readout and (2) POST to the server.
-function wireSlider(idx) {{
-  var s = document.getElementById('s' + idx);
-  var v = document.getElementById('v' + idx);
-  function send(val) {{
-    // POST as application/x-www-form-urlencoded
-    fetch('/', {{
-      method: 'POST',
-      headers: {{ 'Content-Type': 'application/x-www-form-urlencoded' }},
-      body: 'led=' + idx + '&brightness=' + encodeURIComponent(val)
-    }}).catch(function(e){{ console.log(e); }});
-  }}
-  // live update the number and send to server on every change
-  s.addEventListener('input', function() {{
-    v.textContent = s.value;
-    send(s.value);
-  }});
-}}
+  Brightness level:<br>
+  <input type="range" name="brightness" min="0" max="100" value="{brightness[selected_led]}"> {brightness[selected_led]}%<br><br>
 
-// Wire all three sliders
-wireSlider(0);
-wireSlider(1);
-wireSlider(2);
-</script>
+  Select LED:<br>
+  <input type="radio" name="led" value="0" {c0}> LED 1 ({brightness[0]}%)<br>
+  <input type="radio" name="led" value="1" {c1}> LED 2 ({brightness[1]}%)<br>
+  <input type="radio" name="led" value="2" {c2}> LED 3 ({brightness[2]}%)<br><br>
 
+  <input type="submit" value="Change Brightness">
+</form>
 </body>
 </html>
 '''
-    return html.encode('utf-8')
+    return bytes(html, 'utf-8')
 
+def parsePOSTdata(data):
+    data_dict = {}
+    idx = data.find('\r\n\r\n') + 4
+    data = data[idx:]
+    pairs = data.split('&')
+    for pair in pairs:
+        if '=' in pair:
+            k, v = pair.split('=')
+            data_dict[k] = v
+    return data_dict
 
-# =========================
-#  WEB SERVER LOOP
-# =========================
 def serve_web_page():
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    s.bind(('', 80))  # run with sudo for port 80
-    s.listen(1)
-    print("Server running — visit http://raspberrypi.local:80 (or your Pi's IP)")
-
     while True:
-        conn, addr = s.accept()
-        try:
-            request = conn.recv(2048)  # a bit larger for safety
-            # Decide by first line (GET/POST)
-            first_line = request.split(b'\r\n', 1)[0]
-            is_post = first_line.startswith(b'POST')
+        conn, (client_ip, client_port) = s.accept()
+        client_message = conn.recv(2048).decode('utf-8')
+        data_dict = parsePOSTdata(client_message)
+        if 'led_select' in data_dict and 'brightness' in data_dict:
+            led_idx = int(data_dict['led_select'])
+            val = int(data_dict['brightness'])
+            set_brightness(led_idx, val)
 
-            if is_post:
-                # Parse body and update PWM; respond with tiny text (no reload)
-                data = parsePOSTdata(request)
-                try:
-                    if 'led' in data and 'brightness' in data:
-                        led_index = int(data['led'])
-                        value = int(data['brightness'])
-                        if 0 <= led_index <= 2:
-                            change_brightness(led_index, value)
-                except Exception as e:
-                    print("POST parse/update error:", e)
+        conn.send(b'HTTP/1.1 200 OK\r\n')
+        conn.send(b'Content-Type: text/html\r\n')
+        conn.send(b'Connection: close\r\n\r\n')
+        conn.sendall(web_page())
+        conn.close()
 
-                # Minimal HTTP 200 text reply
-                conn.send(b'HTTP/1.1 200 OK\r\n')
-                conn.send(b'Content-Type: text/plain\r\n')
-                conn.send(b'Connection: close\r\n\r\n')
-                conn.send(b'OK')
-            else:
-                # Serve the full HTML+JS page on GET
-                conn.send(b'HTTP/1.1 200 OK\r\n')
-                conn.send(b'Content-Type: text/html\r\n')
-                conn.send(b'Connection: close\r\n\r\n')
-                conn.sendall(web_page())
-        finally:
-            conn.close()
+# Socket setup
+s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+s.bind(('', 80))
+s.listen(3)
 
+web_thread = threading.Thread(target=serve_web_page)
+web_thread.daemon = True
+web_thread.start()
 
-# =========================
-#  MAIN
-# =========================
 try:
-    serve_web_page()
+    while True:
+        pass
 except KeyboardInterrupt:
-    print("\nShutting down...")
-finally:
     for p in pwms:
         p.stop()
-    GPIO.cleanup()
+    gpio.cleanup()
+    s.close()
