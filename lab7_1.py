@@ -62,28 +62,21 @@ def web_page(selected_led=0):
 
     html = f'''
 <html>
-<head>
-<title>LED Brightness Control</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<style>
-html{{font-family: Helvetica; text-align:center;}}
-input[type=range]{{width:50%;}}
-</style>
-</head>
+<head><title>LED Brightness Control</title></head>
 <body>
-<h1>LED Brightness Control</h1>
 <form action="/" method="POST">
 
-<p><b>Select LED:</b></p>
-<input type="radio" name="led" value="0" {c0}> LED 1 ({brightness[0]}%)<br>
-<input type="radio" name="led" value="1" {c1}> LED 2 ({brightness[1]}%)<br>
-<input type="radio" name="led" value="2" {c2}> LED 3 ({brightness[2]}%)<br><br>
+  LED Brightness Control<br><br>
 
-<p><b>Brightness (0–100 %)</b></p>
-<input type="range" name="brightness" min="0" max="100" value="{brightness[selected_led]}">
- {brightness[selected_led]}%<br><br>
+  Brightness level:<br>
+  <input type="range" name="brightness" min="0" max="100" value="{brightness[selected_led]}"> {brightness[selected_led]}%<br><br>
 
-<input type="submit" value="Change Brightness">
+  Select LED:<br>
+  <input type="radio" name="led" value="0" {c0}> LED 1 ({brightness[0]}%)<br>
+  <input type="radio" name="led" value="1" {c1}> LED 2 ({brightness[1]}%)<br>
+  <input type="radio" name="led" value="2" {c2}> LED 3 ({brightness[2]}%)<br><br>
+
+  <input type="submit" value="Change Brightness">
 </form>
 </body>
 </html>
