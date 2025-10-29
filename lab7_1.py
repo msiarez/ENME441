@@ -1,98 +1,139 @@
-import RPi.GPIO as gpio
-import threading
+
 import socket
+import RPi.GPIO as GPIO
+import time
 
-gpio.setmode(gpio.BCM)
-
-# Define PWM LED pins
-led_pins = [17, 27, 22]
+# =========================
+#  GPIO + PWM SETUP
+# =========================
+led_pins = [5, 6, 26]      # BCM pin numbers for the 3 LEDs
+freq = 1000                # PWM frequency (Hz)
+brightness = [0, 0, 0]     # store current brightness % for each LED
 pwms = []
+
+GPIO.setmode(GPIO.BCM)
 for pin in led_pins:
-    gpio.setup(pin, gpio.OUT)
-    p = gpio.PWM(pin, 1000)  # 1 kHz PWM
-    p.start(0)
-    pwms.append(p)
+    GPIO.setup(pin, GPIO.OUT)
+    pwm = GPIO.PWM(pin, freq)
+    pwm.start(0)
+    pwms.append(pwm)
 
-# Track brightness levels for each LED
-brightness = [0, 0, 0]  # percent duty cycle
 
-def set_brightness(led_idx, value):
-    brightness[led_idx] = value
-    pwms[led_idx].ChangeDutyCycle(value)
+# =========================
+#  BRIGHTNESS CONTROL
+# =========================
+def change_brightness(index, value):
+    """Clamp and set LED brightness."""
+    try:
+        val = int(value)
+    except:
+        val = 0
+    val = max(0, min(100, val))
+    brightness[index] = val
+    pwms[index].ChangeDutyCycle(val)
 
-def web_page():
-    html = f"""
-    <html><head><title>LED Brightness Control</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <style>
-    html{{font-family: Helvetica; text-align: center;}}
-    h1{{color:#0F3376;}}
-    input[type=range]{{width:50%;}}
-    .button{{background-color:#4CAF50; color:white; padding:10px 24px; font-size:16px; border:none; border-radius:5px; cursor:pointer;}}
-    </style></head>
-    <body>
-    <h1>3-LED Brightness Control</h1>
-    <form action="/" method="POST">
-      <p><b>Select LED:</b></p>
-      <input type="radio" name="led_select" value="0" checked> LED 1<br>
-      <input type="radio" name="led_select" value="1"> LED 2<br>
-      <input type="radio" name="led_select" value="2"> LED 3<br><br>
 
-      <p><b>Brightness (0–100):</b></p>
-      <input type="range" min="0" max="100" name="brightness" value="0"><br><br>
-
-      <button type="submit" class="button">Set Brightness</button>
-    </form>
-
-    <h2>Current LED Levels:</h2>
-    <p>LED 1: {brightness[0]}%</p>
-    <p>LED 2: {brightness[1]}%</p>
-    <p>LED 3: {brightness[2]}%</p>
-    </body></html>
-    """
-    return bytes(html, 'utf-8')
-
+# =========================
+#  POST DATA PARSER
+# =========================
 def parsePOSTdata(data):
-    data_dict = {}
-    idx = data.find('\r\n\r\n') + 4
-    data = data[idx:]
-    pairs = data.split('&')
-    for pair in pairs:
-        if '=' in pair:
-            k, v = pair.split('=')
-            data_dict[k] = v
-    return data_dict
+    """Extract key:value pairs from POST body."""
+    try:
+        data = data.decode('utf-8')
+    except:
+        data = str(data)
+    body_start = data.find('\r\n\r\n') + 4
+    body = data[body_start:]
+    pairs = body.split('&')
+    result = {}
+    for p in pairs:
+        if '=' in p:
+            k, v = p.split('=', 1)
+            result[k] = v
+    return result
 
+
+# =========================
+#  HTML PAGE BUILDER
+# =========================
+def web_page(selected_led=0):
+    # Precompute checked attributes
+    c0 = 'checked' if selected_led == 0 else ''
+    c1 = 'checked' if selected_led == 1 else ''
+    c2 = 'checked' if selected_led == 2 else ''
+
+    # Use triple-single-quoted f-string; align closing quotes with this line
+    html = f'''
+<html>
+<head><title>LED Brightness Control</title></head>
+<body>
+<form action="/" method="POST">
+
+  LED Brightness Control<br><br>
+
+  Brightness level:<br>
+  <input type="range" name="brightness" min="0" max="100" value="{brightness[selected_led]}"> {brightness[selected_led]}%<br><br>
+
+  Select LED:<br>
+  <input type="radio" name="led" value="0" {c0}> LED 1 ({brightness[0]}%)<br>
+  <input type="radio" name="led" value="1" {c1}> LED 2 ({brightness[1]}%)<br>
+  <input type="radio" name="led" value="2" {c2}> LED 3 ({brightness[2]}%)<br><br>
+
+  <input type="submit" value="Change Brightness">
+</form>
+</body>
+</html>
+'''
+    return bytes(html, "utf-8")
+
+
+# =========================
+#  WEB SERVER LOOP
+# =========================
 def serve_web_page():
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    s.bind(('', 80))  # use 80 if running with sudo
+    s.listen(1)
+    print("Server running — visit http://raspberrypi.local:80")
+
     while True:
-        conn, (client_ip, client_port) = s.accept()
-        client_message = conn.recv(2048).decode('utf-8')
-        data_dict = parsePOSTdata(client_message)
-        if 'led_select' in data_dict and 'brightness' in data_dict:
-            led_idx = int(data_dict['led_select'])
-            val = int(data_dict['brightness'])
-            set_brightness(led_idx, val)
+        print("Waiting for connection...")
+        conn, addr = s.accept()
+        print(f"Connection from {addr}")
+        request = conn.recv(1024)
 
-        conn.send(b'HTTP/1.1 200 OK\r\n')
-        conn.send(b'Content-Type: text/html\r\n')
-        conn.send(b'Connection: close\r\n\r\n')
-        conn.sendall(web_page())
-        conn.close()
+        selected_led = 0  # default LED
 
-# Socket setup
-s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-s.bind(('', 80))
-s.listen(3)
+        if b"POST" in request:
+            post_data = parsePOSTdata(request)
+            if "led" in post_data and "brightness" in post_data:
+                try:
+                    led_index = int(post_data["led"])
+                    selected_led = led_index
+                    value = int(post_data["brightness"])
+                    change_brightness(led_index, value)
+                except Exception as e:
+                    print("Error parsing POST:", e)
 
-web_thread = threading.Thread(target=serve_web_page)
-web_thread.daemon = True
-web_thread.start()
+        # Send HTTP response
+        conn.send(b"HTTP/1.1 200 OK\r\n")
+        conn.send(b"Content-Type: text/html\r\n")
+        conn.send(b"Connection: close\r\n\r\n")
+        try:
+            conn.sendall(web_page(selected_led))
+        finally:
+            conn.close()
 
+
+# =========================
+#  MAIN
+# =========================
 try:
-    while True:
-        pass
+    serve_web_page()
 except KeyboardInterrupt:
+    print("\nShutting down...")
+finally:
     for p in pwms:
         p.stop()
-    gpio.cleanup()
-    s.close()
+    GPIO.cleanup()
