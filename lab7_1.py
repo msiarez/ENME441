@@ -60,8 +60,8 @@ def web_page():
 <html>
 <head><title>LED Brightness Control</title></head>
 <body>
-<h2>Raspberry Pi LED Brightness Control</h2>
 
+<!-- Problem 2: three independent sliders, no submit button -->
 <div>
   LED1:
   <input id="s0" type="range" min="0" max="100" value="{brightness[0]}">
@@ -81,23 +81,26 @@ def web_page():
 </div>
 
 <script>
-// Attach input listeners that update % readout and POST to server
+// Attach input listeners that (1) update the % readout and (2) POST to the server.
 function wireSlider(idx) {{
   var s = document.getElementById('s' + idx);
   var v = document.getElementById('v' + idx);
   function send(val) {{
+    // POST as application/x-www-form-urlencoded
     fetch('/', {{
       method: 'POST',
       headers: {{ 'Content-Type': 'application/x-www-form-urlencoded' }},
       body: 'led=' + idx + '&brightness=' + encodeURIComponent(val)
-    }}).catch(e => console.log(e));
+    }}).catch(function(e){{ console.log(e); }});
   }}
+  // live update the number and send to server on every change
   s.addEventListener('input', function() {{
     v.textContent = s.value;
     send(s.value);
   }});
 }}
 
+// Wire all three sliders
 wireSlider(0);
 wireSlider(1);
 wireSlider(2);
