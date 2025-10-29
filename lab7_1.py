@@ -5,9 +5,9 @@ import time
 # =========================
 #  GPIO + PWM SETUP
 # =========================
-led_pins = [5, 6, 26]      # BCM pin numbers for 3 LEDs
+led_pins = [5, 6, 26]      # BCM pin numbers for the 3 LEDs
 freq = 1000                # PWM frequency (Hz)
-brightness = [0, 0, 0]     # current brightness level (0–100%)
+brightness = [0, 0, 0]     # store current brightness % for each LED
 pwms = []
 
 GPIO.setmode(GPIO.BCM)
@@ -22,10 +22,10 @@ for pin in led_pins:
 #  BRIGHTNESS CONTROL
 # =========================
 def change_brightness(index, value):
-    """Clamp and set LED brightness for the given LED index."""
+    """Clamp and set LED brightness."""
     try:
         val = int(value)
-    except ValueError:
+    except:
         val = 0
     val = max(0, min(100, val))
     brightness[index] = val
@@ -43,19 +43,22 @@ def parsePOSTdata(data):
         text = str(data)
     body_start = text.find('\r\n\r\n') + 4
     body = text[body_start:]
+    # minimal parsing (good enough for short bodies like 'led=1&brightness=77')
     pairs = body.split('&')
     result = {}
     for p in pairs:
         if '=' in p:
             k, v = p.split('=', 1)
+            # replace + with space; percent-decoding not needed for digits
             result[k] = v.replace('+', ' ')
     return result
 
 
 # =========================
-#  HTML PAGE (with JS sliders)
+#  HTML + JAVASCRIPT PAGE (Problem 2)
 # =========================
 def web_page():
+    # Use a triple-single-quoted f-string to avoid accidental """ conflicts
     html = f'''
 <html>
 <head><title>LED Brightness Control</title></head>
@@ -113,23 +116,25 @@ wireSlider(2);
 
 
 # =========================
-#  SIMPLE WEB SERVER LOOP
+#  WEB SERVER LOOP
 # =========================
 def serve_web_page():
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    s.bind(('', 80))  # requires sudo
+    s.bind(('', 80))  # run with sudo for port 80
     s.listen(1)
-    print("Server running — visit http://raspberrypi.local (or your Pi's IP)")
+    print("Server running — visit http://raspberrypi.local:80 (or your Pi's IP)")
 
     while True:
         conn, addr = s.accept()
         try:
-            request = conn.recv(2048)
+            request = conn.recv(2048)  # a bit larger for safety
+            # Decide by first line (GET/POST)
             first_line = request.split(b'\r\n', 1)[0]
             is_post = first_line.startswith(b'POST')
 
             if is_post:
+                # Parse body and update PWM; respond with tiny text (no reload)
                 data = parsePOSTdata(request)
                 try:
                     if 'led' in data and 'brightness' in data:
@@ -138,13 +143,15 @@ def serve_web_page():
                         if 0 <= led_index <= 2:
                             change_brightness(led_index, value)
                 except Exception as e:
-                    print("POST update error:", e)
+                    print("POST parse/update error:", e)
 
+                # Minimal HTTP 200 text reply
                 conn.send(b'HTTP/1.1 200 OK\r\n')
                 conn.send(b'Content-Type: text/plain\r\n')
                 conn.send(b'Connection: close\r\n\r\n')
                 conn.send(b'OK')
             else:
+                # Serve the full HTML+JS page on GET
                 conn.send(b'HTTP/1.1 200 OK\r\n')
                 conn.send(b'Content-Type: text/html\r\n')
                 conn.send(b'Connection: close\r\n\r\n')
@@ -164,4 +171,3 @@ finally:
     for p in pwms:
         p.stop()
     GPIO.cleanup()
-    print("GPIO cleaned up.")
