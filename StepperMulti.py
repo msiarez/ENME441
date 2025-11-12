@@ -1,6 +1,6 @@
 import time
 import multiprocessing
-from shifter import Shifter  # your custom module
+from shifter import Shifter
 
 # Shared array for two steppers (integers)
 myArray = multiprocessing.Array('i', 2)
@@ -8,7 +8,7 @@ myArray = multiprocessing.Array('i', 2)
 class Stepper:
     seq = [0b0001, 0b0011, 0b0010, 0b0110,
            0b0100, 0b1100, 0b1000, 0b1001]
-    delay = 3000  # microseconds
+    delay = 3000
     steps_per_degree = 1024 / 360
 
     def __init__(self, shifter, lock, index):
@@ -30,15 +30,12 @@ class Stepper:
             # Set new bits
             myArray[self.index] |= (Stepper.seq[self.step_state] << self.shifter_bit_start)
 
-            # Combine all motor bytes
             final = 0
             for val in myArray:
                 final |= val
 
-            # Send to shift register
             self.s.shiftByte(final)
 
-            # Update angle
             self.angle = (self.angle + direction / Stepper.steps_per_degree) % 360
 
         time.sleep(Stepper.delay / 1e6)
@@ -65,11 +62,9 @@ if __name__ == '__main__':
     m1 = Stepper(s, lock, 0)
     m2 = Stepper(s, lock, 1)
 
-    # Start both motors at once
     p1 = m1.rotate(90)
     p2 = m2.rotate(-90)
 
-    # Wait for both to finish
     p1.join()
     p2.join()
 
