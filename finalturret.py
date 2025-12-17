@@ -529,7 +529,7 @@ def serve_web(m_alt, m_az):
         s.close()
 
 
-#Setup of the components of the turret and initializing the motors
+#setup of the components of the turret and initializing the motors
 def main():
     global calib_alt, calib_az
 
