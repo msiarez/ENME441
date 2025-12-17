@@ -450,17 +450,18 @@ Auto Sequence Status
     """
     return html.encode('utf-8')
 
-
-# ---------- WEB SERVER ----------
+#define the webserver function, receives references to the altitude and azimuth motors
 def serve_web(m_alt, m_az):
     global calib_alt, calib_az, auto_running
 
+#create a TCP socket
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     s.bind(('', 8080))
     s.listen(3)
     print("Web server running on port 8080...")
 
+#blocks until a browser connects
     try:
         while True:
             conn, addr = s.accept()
@@ -473,7 +474,7 @@ def serve_web(m_alt, m_az):
                 if msg.startswith("POST"):
                     data = parsePOSTdata(msg)
 
-                    # Motor 1: ALTITUDE (logical)
+                    #motor 1: altitude, receives logical altitude angle and moves motor to that angle
                     if "alt" in data and data["alt"].strip() != "":
                         try:
                             log_target_alt = float(data["alt"])
@@ -482,7 +483,7 @@ def serve_web(m_alt, m_az):
                         except ValueError:
                             pass
 
-                    # Motor 2: AZIMUTH (logical)
+                    #motor 2: azimuth, receives logical azimuth angle and moves motor to that angle
                     if "az" in data and data["az"].strip() != "":
                         try:
                             log_target_az = float(data["az"])
@@ -491,7 +492,7 @@ def serve_web(m_alt, m_az):
                         except ValueError:
                             pass
 
-                    # Laser controls
+                    #fires laser for a fixed time, also has on and off commands
                     if "laser_test" in data:
                         threading.Thread(target=test_laser, daemon=True).start()
                     if "laser_on" in data:
@@ -499,24 +500,25 @@ def serve_web(m_alt, m_az):
                     if "laser_off" in data:
                         laser_off()
 
-                    # Calibration: current physical angles become logical (0,0)
+                    #sets current angle of motors as (0,0)
                     if "set_zero" in data:
                         calib_alt = m_alt.angle
                         calib_az  = m_az.angle
                         print(f"[CALIBRATION] Set current position as (0,0): "
                               f"calib_alt={calib_alt:.2f}, calib_az={calib_az:.2f}")
 
-                    # Start auto sequence
+                    #start auto sequence
                     if "auto" in data and not auto_running:
                         print("[AUTO] Starting auto sequence...")
                         threading.Thread(target=auto_sequence,
                                          args=(m_alt, m_az),
                                          daemon=True).start()
 
-                # Logical angles for display
+                #logical angles for display
                 log_alt = logical_from_physical(m_alt.angle, calib_alt)
                 log_az  = logical_from_physical(m_az.angle,  calib_az)
 
+                #build HTML page and angles as well as JSON and auto sequence status
                 response_body = web_page(log_alt, log_az)
                 header = b"HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\n\r\n"
                 conn.sendall(header + response_body)
@@ -527,11 +529,11 @@ def serve_web(m_alt, m_az):
         s.close()
 
 
-# ---------- MAIN ----------
+#Setup of the components of the turret and initializing the motors
 def main():
     global calib_alt, calib_az
 
-    # GPIO setup moved here so errors don't kill the script at import time
+    #GPIO setup moved here so errors don't kill the script at import time
     GPIO.setmode(GPIO.BCM)
     GPIO.setwarnings(False)
     GPIO.setup(laser, GPIO.OUT)
@@ -539,7 +541,7 @@ def main():
 
     sh = Shifter(23, 24, 25)
 
-    # motor 0 = ALTITUDE, motor 1 = AZIMUTH
+    #motor 0 = ALTITUDE, motor 1 = AZIMUTH
     m_alt = Stepper(sh, 0)
     m_az  = Stepper(sh, 1)
 
@@ -549,7 +551,7 @@ def main():
     calib_alt = m_alt.angle
     calib_az  = m_az.angle
 
-    # Try to load JSON once at startup (non-fatal if it fails)
+    #try to load JSON once at startup
     json_display()
 
     t = threading.Thread(target=serve_web, args=(m_alt, m_az), daemon=True)
@@ -566,7 +568,7 @@ def main():
     finally:
         GPIO.cleanup()
 
-
+#fatal error protection
 if __name__ == '__main__':
     try:
         main()
